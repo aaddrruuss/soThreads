@@ -1,7 +1,3 @@
-/*
-? Crear 10 threads, cada uno usa un unico numero primo del array y lo imprime por pantalla
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,22 +7,24 @@
 int primos[10] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
 int size_primos = sizeof(primos)/sizeof(int);
 
-
 void* printPrimos(void* numero){
     int idx = *(int*)numero;
-    int suma = 0;
+    int* resultado = malloc(sizeof(int));
+    *resultado = 0;
 
-    for (int i = 0 ; i < 5 ; i++) {
-        suma += primos[idx + i];
+    for (int i = 0; i < 5; i++) {
+        *resultado += primos[idx + i];
     }
-    *(int *)numero = suma;
-    return numero;
+    
+    free(numero); 
+    return resultado;
 }
 
-void crearThreads(pthread_t *th, int size_array, void* function, void* args){
-    for (int i = 0 ; i < size_array; i++){
-        *(int *)args = i * 5;
-        if (pthread_create(&th[i], NULL, function, args) != 0) {
+void crearThreads(pthread_t *th, int size_array, void* function){
+    for (int i = 0; i < size_array; i++){
+        int *a = malloc(sizeof(int));
+        *a = i * 5;
+        if (pthread_create(&th[i], NULL, function, a) != 0) {
             perror("pthread_create: ");
             exit(-1);
         }
@@ -34,31 +32,45 @@ void crearThreads(pthread_t *th, int size_array, void* function, void* args){
     }
 }
 
-void esperarThreads(pthread_t *th, int size_array, void* save_here){
-    for (int i = 0 ; i < size_array; i++){
-        if (pthread_join(th[i], save_here) != 0) {
+int esperarThreads(pthread_t *th, int size_array, void** save_here){
+    int res = 0;
+    for (int i = 0; i < size_array; i++){
+        void* resultado;
+        if (pthread_join(th[i], &resultado) != 0) {
             perror("pthread_join: ");
             exit(-1);
         }
-        // fprintf(stdout, "Thread %d termiando ejecucion\n", i);
+        res += *(int*)resultado;
+        if (save_here != NULL) {
+            save_here[i] = resultado;
+            printf("Resultado %d es %d\n", i , *(int*)save_here[i]);
+        }
     }
 }
 
 int main(int argc, char const *argv[]) {
     pthread_t t1[2];
-    void* suma = malloc(sizeof(int)) ;
-    printf("Suma de todos los valores del array [");
-    crearThreads(t1, 2, printPrimos, suma);
-    esperarThreads(t1, 2, suma);
-    for(int i = 0 ; i < size_primos ; i++) {
-        if (i != size_primos -1 ) {
-            printf("%d ", primos[i]);
-        }else {
+    void* resultados[2] = {0};
+    int suma_total = 0;
+    
+    printf("Valores del array [");
+    for(int i = 0; i < size_primos; i++) {
+        if (i != size_primos - 1) {
+            printf("%d, ", primos[i]);
+        } else {
             printf("%d", primos[i]);
         }
     }
-    printf("]\nEs: %d", *(int *)suma);
-
-    free(suma);
+    printf("]\n");
+    
+    crearThreads(t1, 2, printPrimos);
+    esperarThreads(t1, 2, resultados);
+    int res = 0;
+    for (int i = 0 ; i < 2 ; i++) {
+        res += *(int *)resultados[i];
+    }
+    
+    printf("La suma calculada por los hilos es: %d\n", res);
+    
     return 0;
 }
